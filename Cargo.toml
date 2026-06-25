@@ -9,6 +9,7 @@ homepage = "https://github.com/gamepunk/vanitygen"
 readme = "README.md"
 keywords = ["bitcoin", "vanity", "address", "crypto", "wallet"]
 categories = ["command-line-utilities", "cryptography"]
+rust-version = "1.70"
 
 [[bin]]
 name = "vanitygen"

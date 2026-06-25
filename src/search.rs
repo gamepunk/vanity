@@ -81,59 +81,57 @@ pub fn is_match(
 // Public dispatcher
 // -----------------------------------------------------------------------
 
-/// Launch `num_threads` workers to search for an address matching
-/// `pattern` according to `match_mode`.
+/// All parameters that control a vanity search.
 ///
-/// When `use_bip32` is true the workers walk through BIP32 address indices
-/// (each worker generates its own random BIP39 mnemonic), producing a
-/// mnemonic seed phrase together with the result.  This is **much slower**
-/// but allows importing the found key via a standard BIP39 wallet.
-///
-/// This function **blocks** until `target_count` matches are found.
-#[allow(clippy::too_many_arguments)]
-pub fn search(
-    pattern: &str,
-    addr_type: AddressType,
-    case_insensitive: bool,
-    compressed: bool,
-    network: Network,
-    num_threads: usize,
-    use_bip32: bool,
-    quiet: bool,
-    match_mode: MatchMode,
-    bip39_words: usize,
-    target_count: usize,
-) -> Result<(Vec<FoundResult>, std::time::Duration), Error> {
-    let pattern = Arc::new(pattern.to_string());
-    let match_mode = Arc::new(match_mode);
+/// Separate from `commands::SearchConfig` because this lives in the
+/// search module and doesn't need output/bark fields.
+#[derive(Debug, Clone)]
+pub struct SearchParams<'a> {
+    pub pattern: &'a str,
+    pub addr_type: AddressType,
+    pub case_insensitive: bool,
+    pub compressed: bool,
+    pub network: Network,
+    pub num_threads: usize,
+    pub use_bip32: bool,
+    pub quiet: bool,
+    pub match_mode: MatchMode,
+    pub bip39_words: usize,
+    pub target_count: usize,
+}
+
+/// Launch multiple workers to search for addresses matching the given
+/// parameters.  Blocks until `params.target_count` matches are found.
+pub fn search(params: SearchParams) -> Result<(Vec<FoundResult>, std::time::Duration), Error> {
+    let p = Arc::new(params.pattern.to_string());
+    let match_mode = Arc::new(params.match_mode);
     let found_count = Arc::new(AtomicU64::new(0));
     let counter = Arc::new(AtomicU64::new(0));
     let results: Arc<Mutex<Vec<FoundResult>>> = Arc::new(Mutex::new(Vec::new()));
 
     // Pre-compile regex if needed.
     let re: Option<Regex> = match *match_mode {
-        MatchMode::Regex => Some(
-            Regex::new(&pattern)
-                .map_err(|e| Error::Other(format!("Invalid regex pattern: {e}")))?,
-        ),
+        MatchMode::Regex => {
+            Some(Regex::new(&p).map_err(|e| Error::Other(format!("Invalid regex pattern: {e}")))?)
+        }
         _ => None,
     };
     let re = Arc::new(re);
 
     // Pre-compute the comparison string for non-regex modes.
-    let cmp_pat = if case_insensitive {
-        pattern.to_lowercase()
+    let cmp_pat = if params.case_insensitive {
+        p.to_lowercase()
     } else {
-        pattern.to_string()
+        p.to_string()
     };
     let cmp_pat = Arc::new(cmp_pat);
 
     let start = Instant::now();
 
     // ── Spawn workers ───────────────────────────────────────────────
-    let mut handles = Vec::with_capacity(num_threads);
-    for _ in 0..num_threads {
-        let pattern = Arc::clone(&pattern);
+    let mut handles = Vec::with_capacity(params.num_threads);
+    for _ in 0..params.num_threads {
+        let pattern = Arc::clone(&p);
         let cmp_pat = Arc::clone(&cmp_pat);
         let re = Arc::clone(&re);
         let match_mode = Arc::clone(&match_mode);
@@ -141,21 +139,21 @@ pub fn search(
         let counter = Arc::clone(&counter);
         let results = Arc::clone(&results);
 
-        if use_bip32 {
+        if params.use_bip32 {
             handles.push(std::thread::spawn(move || {
                 worker_bip32(
                     &pattern,
                     &cmp_pat,
                     &re,
                     match_mode,
-                    addr_type,
-                    case_insensitive,
-                    network,
+                    params.addr_type,
+                    params.case_insensitive,
+                    params.network,
                     found_count,
                     counter,
                     results,
-                    bip39_words,
-                    target_count,
+                    params.bip39_words,
+                    params.target_count,
                 );
             }));
         } else {
@@ -165,14 +163,14 @@ pub fn search(
                     &cmp_pat,
                     &re,
                     match_mode,
-                    addr_type,
-                    case_insensitive,
-                    compressed,
-                    network,
+                    params.addr_type,
+                    params.case_insensitive,
+                    params.compressed,
+                    params.network,
                     found_count,
                     counter,
                     results,
-                    target_count,
+                    params.target_count,
                 );
             }));
         }
@@ -180,10 +178,10 @@ pub fn search(
 
     // ── Progress reporter (main thread) ─────────────────────────────
     let checkpoint_params = checkpoint::SearchParams {
-        prefix: pattern.to_string(),
-        address_type: addr_type,
-        case_insensitive,
-        threads: num_threads,
+        prefix: p.to_string(),
+        address_type: params.addr_type,
+        case_insensitive: params.case_insensitive,
+        threads: params.num_threads,
     };
     let mut checkpoint_tick: u32 = 0;
 
@@ -191,7 +189,7 @@ pub fn search(
         std::thread::sleep(std::time::Duration::from_millis(1500));
 
         let n_found = found_count.load(Ordering::Relaxed) as usize;
-        if n_found >= target_count {
+        if n_found >= params.target_count {
             break;
         }
 
@@ -199,19 +197,19 @@ pub fn search(
         let n = counter.load(Ordering::Relaxed);
         let rate = n as f64 / elapsed.as_secs_f64().max(0.001);
 
-        if !quiet {
+        if !params.quiet {
             style::progress_line(n, rate / 1_000_000.0, elapsed.as_secs_f64());
         }
 
         // Save checkpoint every ~30s (≈20 ticks).
         checkpoint_tick += 1;
-        if checkpoint_tick.is_multiple_of(20) {
+        if checkpoint_tick % 20 == 0 {
             checkpoint::save(&checkpoint_params, n, elapsed);
         }
     }
 
     // Final newline after progress line.
-    if !quiet {
+    if !params.quiet {
         eprintln!();
     }
 

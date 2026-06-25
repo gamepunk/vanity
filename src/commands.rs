@@ -204,19 +204,19 @@ pub fn run_search(cfg: &config::Config, sc: SearchConfig) -> Result<(), Error> {
     }
 
     // ── Search ──────────────────────────────────────────────────────
-    let (results, elapsed) = search::search(
-        sc.pattern,
-        sc.addr_type,
-        sc.case_insensitive,
-        sc.compressed,
-        sc.network,
-        sc.num_threads,
-        sc.use_bip32,
-        sc.quiet,
-        sc.match_mode,
-        sc.bip39_words,
-        sc.target_count,
-    )?;
+    let (results, elapsed) = search::search(search::SearchParams {
+        pattern: sc.pattern,
+        addr_type: sc.addr_type,
+        case_insensitive: sc.case_insensitive,
+        compressed: sc.compressed,
+        network: sc.network,
+        num_threads: sc.num_threads,
+        use_bip32: sc.use_bip32,
+        quiet: sc.quiet,
+        match_mode: sc.match_mode,
+        bip39_words: sc.bip39_words,
+        target_count: sc.target_count,
+    })?;
 
     // ── Clear checkpoint + write log ───────────────────────────────
     crate::checkpoint::clear();

@@ -4,7 +4,7 @@
 //! potential external consumers.
 
 pub mod address;
-pub mod benchmark;
+pub(crate) mod benchmark;
 pub mod checkpoint;
 pub mod cli;
 pub mod commands;
@@ -12,9 +12,9 @@ pub mod config;
 pub mod error;
 pub mod log;
 pub mod mnemonic;
-pub mod notify;
+pub(crate) mod notify;
 pub mod search;
-pub mod self_test;
+pub(crate) mod self_test;
 pub mod style;
-pub mod verify;
+pub(crate) mod verify;
 pub mod wif;
