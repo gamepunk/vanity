@@ -10,9 +10,9 @@
 
 use bip39::Mnemonic;
 use bitcoin::{
-    Network,
     bip32::{DerivationPath, Xpriv},
     secp256k1::Secp256k1,
+    Network,
 };
 use rand::rngs::OsRng;
 use rand::RngCore;
@@ -65,16 +65,13 @@ pub fn generate_random() -> Result<MnemonicResult, Error> {
     // ── BIP39 seed → BIP32 master key ──────────────────────────────
     let seed = mnemonic.to_seed("");
     let secp = Secp256k1::new();
-    let master = Xpriv::new_master(Network::Bitcoin, &seed)
-        .map_err(|e| Error::Bip32(e))?;
+    let master = Xpriv::new_master(Network::Bitcoin, &seed).map_err(Error::Bip32)?;
 
     // ── Derive each standard path ───────────────────────────────────
     let mut paths = Vec::with_capacity(DERIVATION_PATHS.len());
     for &(path_str, label) in DERIVATION_PATHS {
-        let path: DerivationPath = path_str.parse()
-            .map_err(|e| Error::Bip32(e))?;
-        let child = master.derive_priv(&secp, &path)
-            .map_err(|e| Error::Bip32(e))?;
+        let path: DerivationPath = path_str.parse().map_err(Error::Bip32)?;
+        let child = master.derive_priv(&secp, &path).map_err(Error::Bip32)?;
 
         let set = derive_all(&secp, &child.private_key, true, Network::Bitcoin)?;
         let wif_str = wif::format_wif(&child.private_key, true, Network::Bitcoin);

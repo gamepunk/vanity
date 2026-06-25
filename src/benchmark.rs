@@ -2,8 +2,8 @@
 
 use std::time::Instant;
 
-use bitcoin::Network;
 use bitcoin::secp256k1::{Secp256k1, SecretKey};
+use bitcoin::Network;
 use rand::rngs::OsRng;
 use rand::RngCore;
 
@@ -16,12 +16,16 @@ const ITER_PER_THREAD: usize = 50_000;
 /// Run the benchmark and print results to stderr.
 pub fn run() -> Result<(), Error> {
     let num_threads = std::thread::available_parallelism()
-        .map(|n| n.get()).unwrap_or(4);
+        .map(|n| n.get())
+        .unwrap_or(4);
     let total_iters = num_threads * ITER_PER_THREAD;
 
     crate::style::header("Benchmark");
     crate::style::kv("threads", &num_threads.to_string());
-    crate::style::kv("iterations", &format!("{} ({} per thread)", total_iters, ITER_PER_THREAD));
+    crate::style::kv(
+        "iterations",
+        &format!("{} ({} per thread)", total_iters, ITER_PER_THREAD),
+    );
     eprintln!();
 
     // Generate random secret keys upfront so we don't measure RNG time.
@@ -52,9 +56,7 @@ pub fn run() -> Result<(), Error> {
         }));
     }
 
-    let total_success: usize = handles.into_iter()
-        .map(|h| h.join().unwrap_or(0))
-        .sum();
+    let total_success: usize = handles.into_iter().map(|h| h.join().unwrap_or(0)).sum();
 
     let elapsed = start.elapsed().as_secs_f64();
     let rate = total_success as f64 / elapsed;
@@ -64,7 +66,10 @@ pub fn run() -> Result<(), Error> {
     crate::style::kv("keys derived", &total_success.to_string());
     crate::style::kv("speed", &format!("{:.2} Mkeys/s", rate / 1_000_000.0));
     crate::style::kv("threads", &num_threads.to_string());
-    crate::style::kv("per thread", &format!("{:.2} kkeys/s", (rate / num_threads as f64) / 1_000.0));
+    crate::style::kv(
+        "per thread",
+        &format!("{:.2} kkeys/s", (rate / num_threads as f64) / 1_000.0),
+    );
     eprintln!();
 
     Ok(())

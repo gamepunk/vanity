@@ -106,32 +106,17 @@ pub fn print_and_confirm(checkpoint: &Checkpoint) -> bool {
         .duration_since(checkpoint.timestamp)
         .unwrap_or_default();
 
-    eprintln!(
-        "─────────────────────────────────────────────────────────────"
-    );
-    eprintln!(
-        "[检查点] 发现之前的搜索进度："
-    );
-    eprintln!(
-        "  目标前缀:    {}",
-        checkpoint.params.prefix
-    );
-    eprintln!(
-        "  已尝试:      {} 次",
-        checkpoint.attempts
-    );
+    eprintln!("─────────────────────────────────────────────────────────────");
+    eprintln!("[检查点] 发现之前的搜索进度：");
+    eprintln!("  目标前缀:    {}", checkpoint.params.prefix);
+    eprintln!("  已尝试:      {} 次", checkpoint.attempts);
     eprintln!(
         "  已耗时:      {:.0} 秒 ({})",
         checkpoint.elapsed.as_secs_f64(),
         format_duration(checkpoint.elapsed)
     );
-    eprintln!(
-        "  距离上次:    {}",
-        format_duration(ago)
-    );
-    eprintln!(
-        "─────────────────────────────────────────────────────────────"
-    );
+    eprintln!("  距离上次:    {}", format_duration(ago));
+    eprintln!("─────────────────────────────────────────────────────────────");
     // Always resume — the checkpoint is informational only (search is
     // stateless, so we just continue with fresh random keys).
     true

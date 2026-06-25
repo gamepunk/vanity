@@ -13,9 +13,9 @@ use std::time::Instant;
 
 use bip39::Mnemonic;
 use bitcoin::{
-    Network,
     bip32::{DerivationPath, Xpriv},
-    secp256k1::{Secp256k1, SecretKey, Scalar},
+    secp256k1::{Scalar, Secp256k1, SecretKey},
+    Network,
 };
 use rand::rngs::OsRng;
 use rand::RngCore;
@@ -23,9 +23,9 @@ use rand::RngCore;
 use crate::address::{self as addr, derive_single};
 use crate::checkpoint;
 use crate::cli::AddressType;
+use crate::error::Error;
 use crate::style;
 use crate::wif;
-use crate::error::Error;
 
 /// How many iterations a worker does before re-randomising its starting point.
 const BATCH_SIZE: u64 = 5_000_000;
@@ -57,6 +57,7 @@ pub struct FoundResult {
 /// but allows importing the found key via a standard BIP39 wallet.
 ///
 /// This function **blocks** until a match is found.
+#[allow(clippy::too_many_arguments)]
 pub fn search(
     prefix: &str,
     addr_type: AddressType,
@@ -146,7 +147,7 @@ pub fn search(
 
         // Save checkpoint every ~30s (≈20 ticks).
         checkpoint_tick += 1;
-        if checkpoint_tick % 20 == 0 {
+        if checkpoint_tick.is_multiple_of(20) {
             checkpoint::save(&checkpoint_params, n, elapsed);
         }
     }
@@ -158,7 +159,8 @@ pub fn search(
 
     // ── Join ────────────────────────────────────────────────────────
     for h in handles {
-        h.join().map_err(|_| Error::ThreadPool("worker panicked".into()))?;
+        h.join()
+            .map_err(|_| Error::ThreadPool("worker panicked".into()))?;
     }
 
     let elapsed = start.elapsed();
@@ -211,7 +213,7 @@ fn worker(
             let addr_str = match addr_type {
                 AddressType::Legacy => {
                     let pk_bytes = if compressed {
-                        pk.serialize().to_vec()    // 33 bytes
+                        pk.serialize().to_vec() // 33 bytes
                     } else {
                         pk.serialize_uncompressed().to_vec() // 65 bytes
                     };

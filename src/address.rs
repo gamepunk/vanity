@@ -3,11 +3,11 @@
 //! All hash / curve operations are delegated to `rust-bitcoin` / `secp256k1`.
 //! This module only contains glue logic.
 
-use bitcoin::{
-    Address, CompressedPublicKey, Network, PublicKey, ScriptBuf,
-    secp256k1::{Secp256k1, SecretKey, PublicKey as SecpPublicKey},
-};
 use crate::error::Error;
+use bitcoin::{
+    secp256k1::{PublicKey as SecpPublicKey, Secp256k1, SecretKey},
+    Address, CompressedPublicKey, Network, PublicKey, ScriptBuf,
+};
 
 /// A set of all four address types derived from a single key pair.
 #[derive(Debug, Clone)]
@@ -28,7 +28,7 @@ pub struct AddressSet {
 /// * `sk`   – the private key.
 /// * `compressed` – whether to use the compressed public key format
 ///   (affects Legacy addresses; P2SH, SegWit and Taproot always use
-///    compressed / x-only keys internally).
+///   compressed / x-only keys internally).
 /// * `network` – `Bitcoin`, `Testnet`, `Signet`, or `Regtest`.
 pub fn derive_all<C: bitcoin::secp256k1::Signing + bitcoin::secp256k1::Verification>(
     secp: &Secp256k1<C>,
@@ -37,17 +37,23 @@ pub fn derive_all<C: bitcoin::secp256k1::Signing + bitcoin::secp256k1::Verificat
     network: Network,
 ) -> Result<AddressSet, Error> {
     let secp_pk = SecpPublicKey::from_secret_key(secp, sk);
-    let pubkey = PublicKey { inner: secp_pk, compressed };
+    let pubkey = PublicKey {
+        inner: secp_pk,
+        compressed,
+    };
     // P2SH, SegWit and Taproot always require the compressed public key
     // internally, regardless of the `compressed` flag (which only affects
     // Legacy P2PKH).
-    let pubkey_compressed = PublicKey { inner: secp_pk, compressed: true };
+    let pubkey_compressed = PublicKey {
+        inner: secp_pk,
+        compressed: true,
+    };
 
     Ok(AddressSet {
-        legacy:       Address::p2pkh(&pubkey, network),
-        p2sh_segwit:  p2sh_wpkh(&pubkey_compressed, network),
+        legacy: Address::p2pkh(pubkey, network),
+        p2sh_segwit: p2sh_wpkh(&pubkey_compressed, network),
         native_segwit: native_segwit(&pubkey_compressed, network),
-        taproot:      derive_taproot(secp, &secp_pk, network)?,
+        taproot: derive_taproot(secp, &secp_pk, network)?,
     })
 }
 
@@ -62,12 +68,21 @@ pub fn derive_single<C: bitcoin::secp256k1::Signing + bitcoin::secp256k1::Verifi
     use crate::cli::AddressType::*;
     let secp_pk = SecpPublicKey::from_secret_key(secp, sk);
     // P2SH / SegWit / Taproot always need the compressed public key.
-    let pubkey = PublicKey { inner: secp_pk, compressed: true };
+    let pubkey = PublicKey {
+        inner: secp_pk,
+        compressed: true,
+    };
 
     match addr_type {
-        Legacy  => Ok(Address::p2pkh(&PublicKey { inner: secp_pk, compressed }, network)),
-        P2sh    => Ok(p2sh_wpkh(&pubkey, network)),
-        Segwit  => Ok(native_segwit(&pubkey, network)),
+        Legacy => Ok(Address::p2pkh(
+            PublicKey {
+                inner: secp_pk,
+                compressed,
+            },
+            network,
+        )),
+        P2sh => Ok(p2sh_wpkh(&pubkey, network)),
+        Segwit => Ok(native_segwit(&pubkey, network)),
         Taproot => derive_taproot(secp, &secp_pk, network),
     }
 }
@@ -159,17 +174,18 @@ fn derive_taproot<C: bitcoin::secp256k1::Verification>(
 /// create the P2WPKH script and then wrap it via `Address::p2sh`.
 fn p2sh_wpkh(pubkey: &PublicKey, network: Network) -> Address {
     let wpkh_script = ScriptBuf::new_p2wpkh(
-        &pubkey.wpubkey_hash().expect("P2SH-P2WPKH requires a compressed public key"),
+        &pubkey
+            .wpubkey_hash()
+            .expect("P2SH-P2WPKH requires a compressed public key"),
     );
-    Address::p2sh(&wpkh_script, network)
-        .expect("valid P2SH script")
+    Address::p2sh(&wpkh_script, network).expect("valid P2SH script")
 }
 
 /// Build a native SegWit (P2WPKH) address from a [`PublicKey`].
 /// Requires a compressed public key.
 fn native_segwit(pubkey: &PublicKey, network: Network) -> Address {
-    let compressed = CompressedPublicKey::try_from(pubkey.clone())
-        .expect("P2WPKH requires a compressed public key");
+    let compressed =
+        CompressedPublicKey::try_from(*pubkey).expect("P2WPKH requires a compressed public key");
     Address::p2wpkh(&compressed, network)
 }
 
@@ -192,10 +208,7 @@ mod tests {
 
         let set = derive_all(&secp, &sk, true, Network::Bitcoin).unwrap();
 
-        assert_eq!(
-            set.legacy.to_string(),
-            "1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH"
-        );
+        assert_eq!(set.legacy.to_string(), "1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH");
         assert_eq!(
             set.p2sh_segwit.to_string(),
             "3JvL6Ymt8MVWiCNHC7oWU6nLeHNJKLZGLN"
@@ -220,10 +233,7 @@ mod tests {
 
         let set = derive_all(&secp, &sk, false, Network::Bitcoin).unwrap();
 
-        assert_eq!(
-            set.legacy.to_string(),
-            "1EHNa6Q4Jz2uvNExL497mE43ikXhwF6kZm"
-        );
+        assert_eq!(set.legacy.to_string(), "1EHNa6Q4Jz2uvNExL497mE43ikXhwF6kZm");
     }
 
     /// Fast-path helpers match the safe Address API.
@@ -240,27 +250,37 @@ mod tests {
         // Legacy compressed
         let fast = p2pkh_address_fast(&pk_compressed);
         let safe = Address::p2pkh(
-            &PublicKey { inner: secp_pk, compressed: true },
+            &PublicKey {
+                inner: secp_pk,
+                compressed: true,
+            },
             Network::Bitcoin,
-        ).to_string();
+        )
+        .to_string();
         assert_eq!(fast, safe, "fast P2PKH compressed mismatch");
 
         // Legacy uncompressed
         let fast_u = p2pkh_address_fast(&pk_uncompressed);
         let safe_u = Address::p2pkh(
-            &PublicKey { inner: secp_pk, compressed: false },
+            &PublicKey {
+                inner: secp_pk,
+                compressed: false,
+            },
             Network::Bitcoin,
-        ).to_string();
+        )
+        .to_string();
         assert_eq!(fast_u, safe_u, "fast P2PKH uncompressed mismatch");
 
         // P2SH-P2WPKH (always compressed)
         let fast_p2sh = p2sh_wpkh_address_fast(&pk_compressed);
-        let pubkey_c = PublicKey { inner: secp_pk, compressed: true };
-        let wpkh_script = ScriptBuf::new_p2wpkh(
-            &pubkey_c.wpubkey_hash().unwrap(),
-        );
+        let pubkey_c = PublicKey {
+            inner: secp_pk,
+            compressed: true,
+        };
+        let wpkh_script = ScriptBuf::new_p2wpkh(&pubkey_c.wpubkey_hash().unwrap());
         let safe_p2sh = Address::p2sh(&wpkh_script, Network::Bitcoin)
-            .unwrap().to_string();
+            .unwrap()
+            .to_string();
         assert_eq!(fast_p2sh, safe_p2sh, "fast P2SH mismatch");
     }
 
@@ -270,8 +290,10 @@ mod tests {
         let h = hash160(b"");
         assert_eq!(
             h,
-            [0xb4, 0x72, 0xa2, 0x66, 0xd0, 0xbd, 0x89, 0xc1, 0x37, 0x06,
-             0xa4, 0x13, 0x2c, 0xcf, 0xb1, 0x6f, 0x7c, 0x3b, 0x9f, 0xcb],
+            [
+                0xb4, 0x72, 0xa2, 0x66, 0xd0, 0xbd, 0x89, 0xc1, 0x37, 0x06, 0xa4, 0x13, 0x2c, 0xcf,
+                0xb1, 0x6f, 0x7c, 0x3b, 0x9f, 0xcb
+            ],
             "hash160('') mismatch"
         );
     }
@@ -282,10 +304,11 @@ mod tests {
         let d = double_sha256(b"hello");
         assert_eq!(
             d,
-            [0x95, 0x95, 0xc9, 0xdf, 0x90, 0x07, 0x51, 0x48, 0xeb, 0x06,
-             0x86, 0x03, 0x65, 0xdf, 0x33, 0x58, 0x4b, 0x75, 0xbf, 0xf7,
-             0x82, 0xa5, 0x10, 0xc6, 0xcd, 0x48, 0x83, 0xa4, 0x19, 0x83,
-             0x3d, 0x50],
+            [
+                0x95, 0x95, 0xc9, 0xdf, 0x90, 0x07, 0x51, 0x48, 0xeb, 0x06, 0x86, 0x03, 0x65, 0xdf,
+                0x33, 0x58, 0x4b, 0x75, 0xbf, 0xf7, 0x82, 0xa5, 0x10, 0xc6, 0xcd, 0x48, 0x83, 0xa4,
+                0x19, 0x83, 0x3d, 0x50
+            ],
             "double_sha256('hello') mismatch"
         );
     }

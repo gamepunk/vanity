@@ -31,10 +31,10 @@ pub mod wif;
 
 use std::process;
 
-use clap::Parser;
 use bitcoin::Network;
+use clap::Parser;
 
-use cli::{Cli, CliCommand, AddressType, validate_prefix};
+use cli::{validate_prefix, AddressType, Cli, CliCommand};
 use error::Error;
 
 fn main() {
@@ -43,7 +43,8 @@ fn main() {
 
     // ── Backward-compatible argument rewriting ─────────────────────
     let raw: Vec<String> = std::env::args().collect();
-    let args: Vec<String> = if raw.len() >= 2 && !is_subcommand(&raw[1]) && !raw[1].starts_with('-') {
+    let args: Vec<String> = if raw.len() >= 2 && !is_subcommand(&raw[1]) && !raw[1].starts_with('-')
+    {
         let mut v = vec![raw[0].clone(), "search".to_string()];
         v.extend(raw[1..].iter().cloned());
         v
@@ -54,9 +55,26 @@ fn main() {
     let cli = Cli::parse_from(&args);
 
     let result = match &cli.command {
-        CliCommand::Search { prefix, address_type, case_insensitive, mnemonic, uncompressed, threads, quiet, bark } => {
-            run_search(&cfg, prefix, *address_type, *case_insensitive, *uncompressed, *mnemonic, *threads, *quiet, bark.as_deref())
-        }
+        CliCommand::Search {
+            prefix,
+            address_type,
+            case_insensitive,
+            mnemonic,
+            uncompressed,
+            threads,
+            quiet,
+            bark,
+        } => run_search(
+            &cfg,
+            prefix,
+            *address_type,
+            *case_insensitive,
+            *uncompressed,
+            *mnemonic,
+            *threads,
+            *quiet,
+            bark.as_deref(),
+        ),
         CliCommand::Verify { wif } => verify::run(wif),
         CliCommand::Address { wif } => run_address(wif),
         CliCommand::Benchmark => benchmark::run(),
@@ -72,6 +90,7 @@ fn main() {
 // ── Subcommand implementations ──────────────────────────────────────────
 
 /// Search for a vanity address.
+#[allow(clippy::too_many_arguments)]
 fn run_search(
     cfg: &config::Config,
     prefix: &str,
@@ -122,14 +141,24 @@ fn run_search(
 
     // ── Search ──────────────────────────────────────────────────────
     let (found, elapsed) = search::search(
-        prefix, addr_type, case_insensitive, compressed, network, threads, use_bip32, quiet,
+        prefix,
+        addr_type,
+        case_insensitive,
+        compressed,
+        network,
+        threads,
+        use_bip32,
+        quiet,
     )?;
 
     // ── Clear checkpoint + write log ───────────────────────────────
     checkpoint::clear();
     log::info(&format!(
         "找到! prefix={}, address={}, attempts={}, elapsed={:.2}s",
-        prefix, found.address, found.total_attempts, elapsed.as_secs_f64(),
+        prefix,
+        found.address,
+        found.total_attempts,
+        elapsed.as_secs_f64(),
     ));
 
     let info = wif::parse_wif(&found.wif)?;
@@ -140,7 +169,11 @@ fn run_search(
         let _ = notify::send_bark(
             &bk,
             "🎯 Vanity address found!",
-            &format!("Address: {}\nElapsed: {:.1}s", found.address, elapsed.as_secs_f64()),
+            &format!(
+                "Address: {}\nElapsed: {:.1}s",
+                found.address,
+                elapsed.as_secs_f64()
+            ),
         );
     }
 
@@ -171,16 +204,17 @@ fn run_search(
         style::header("Wallet addresses (index 0)");
         println!("{}", wallet_addrs);
         println!();
-        style::warning("Import the mnemonic into any BIP39 wallet. The above addresses will match exactly.");
+        style::warning(
+            "Import the mnemonic into any BIP39 wallet. The above addresses will match exactly.",
+        );
     } else {
-        let all_addrs = address::derive_all(
-            &secp, &info.private_key.inner, info.compressed, network,
-        )?;
+        let all_addrs =
+            address::derive_all(&secp, &info.private_key.inner, info.compressed, network)?;
         style::header("Same-key addresses");
-        style::result_line("P2PKH",  &all_addrs.legacy.to_string());
-        style::result_line("P2SH",   &all_addrs.p2sh_segwit.to_string());
+        style::result_line("P2PKH", &all_addrs.legacy.to_string());
+        style::result_line("P2SH", &all_addrs.p2sh_segwit.to_string());
         style::result_line("P2WPKH", &all_addrs.native_segwit.to_string());
-        style::result_line("P2TR",   &all_addrs.taproot.to_string());
+        style::result_line("P2TR", &all_addrs.taproot.to_string());
     }
 
     println!();
@@ -192,11 +226,11 @@ fn run_search(
 /// Derive wallet-compatible addresses for all 4 standard BIP32 paths
 /// (BIP44 / BIP49 / BIP84 / BIP86) at a given address index.
 fn derive_wallet_addresses(phrase: &str, index: u32, network: Network) -> Result<String, Error> {
-    use bitcoin::bip32::{DerivationPath, Xpriv};
     use bip39::Mnemonic;
+    use bitcoin::bip32::{DerivationPath, Xpriv};
 
-    let mnemonic = Mnemonic::parse(phrase)
-        .map_err(|e| Error::InvalidWif(format!("mnemonic parse: {e}")))?;
+    let mnemonic =
+        Mnemonic::parse(phrase).map_err(|e| Error::InvalidWif(format!("mnemonic parse: {e}")))?;
     let seed = mnemonic.to_seed("");
     let secp = bitcoin::secp256k1::Secp256k1::new();
     let master = Xpriv::new_master(network, &seed)?;
@@ -214,11 +248,20 @@ fn derive_wallet_addresses(phrase: &str, index: u32, network: Network) -> Result
         let path_str = format!("m/{}'/0'/0'/0/{index}", purpose);
         let path: DerivationPath = path_str.parse()?;
         let child = master.derive_priv(&secp, &path)?;
-        let addr = address::derive_single(&secp, &child.private_key, true, network,
-            if purpose == 44 { cli::AddressType::Legacy }
-            else if purpose == 49 { cli::AddressType::P2sh }
-            else if purpose == 84 { cli::AddressType::Segwit }
-            else { cli::AddressType::Taproot }
+        let addr = address::derive_single(
+            &secp,
+            &child.private_key,
+            true,
+            network,
+            if purpose == 44 {
+                cli::AddressType::Legacy
+            } else if purpose == 49 {
+                cli::AddressType::P2sh
+            } else if purpose == 84 {
+                cli::AddressType::Segwit
+            } else {
+                cli::AddressType::Taproot
+            },
         )?;
         lines.push(format!("  {label:<24} {}  (path: {path_str})", addr));
     }
@@ -230,7 +273,12 @@ fn derive_wallet_addresses(phrase: &str, index: u32, network: Network) -> Result
 fn run_address(wif_str: &str) -> Result<(), Error> {
     let info = wif::parse_wif(wif_str)?;
     let secp = bitcoin::secp256k1::Secp256k1::new();
-    let set = address::derive_all(&secp, &info.private_key.inner, info.compressed, info.network)?;
+    let set = address::derive_all(
+        &secp,
+        &info.private_key.inner,
+        info.compressed,
+        info.network,
+    )?;
 
     let net = match info.network {
         Network::Bitcoin => "Mainnet",
@@ -245,10 +293,10 @@ fn run_address(wif_str: &str) -> Result<(), Error> {
     style::kv("compressed", &info.compressed.to_string());
     println!();
     style::header("Derived addresses");
-    style::result_line("P2PKH",  &set.legacy.to_string());
-    style::result_line("P2SH",   &set.p2sh_segwit.to_string());
+    style::result_line("P2PKH", &set.legacy.to_string());
+    style::result_line("P2SH", &set.p2sh_segwit.to_string());
     style::result_line("P2WPKH", &set.native_segwit.to_string());
-    style::result_line("P2TR",   &set.taproot.to_string());
+    style::result_line("P2TR", &set.taproot.to_string());
     println!();
 
     Ok(())
@@ -263,13 +311,13 @@ fn run_mnemonic() -> Result<(), Error> {
     println!();
 
     for p in &result.paths {
-        style::header(&format!("{}", p.label));
+        style::header(p.label);
         style::kv("path", &p.path);
         style::kv("WIF", &p.wif);
-        style::result_line("P2PKH",  &p.legacy);
-        style::result_line("P2SH",   &p.p2sh);
+        style::result_line("P2PKH", &p.legacy);
+        style::result_line("P2SH", &p.p2sh);
         style::result_line("P2WPKH", &p.segwit);
-        style::result_line("P2TR",   &p.taproot);
+        style::result_line("P2TR", &p.taproot);
         println!();
     }
 
@@ -283,10 +331,17 @@ fn run_mnemonic() -> Result<(), Error> {
 fn is_subcommand(s: &str) -> bool {
     matches!(
         s,
-        "search" | "s"
-        | "verify" | "v"
-        | "address" | "a" | "addr"
-        | "benchmark" | "b" | "bench"
-        | "mnemonic" | "m"
+        "search"
+            | "s"
+            | "verify"
+            | "v"
+            | "address"
+            | "a"
+            | "addr"
+            | "benchmark"
+            | "b"
+            | "bench"
+            | "mnemonic"
+            | "m"
     )
 }

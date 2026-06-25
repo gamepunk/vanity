@@ -99,10 +99,10 @@ pub enum CliCommand {
 /// Supported address types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AddressType {
-    Legacy,   // P2PKH  → 1…
-    P2sh,     // P2SH-wrapped P2WPKH → 3…
-    Segwit,   // Native SegWit P2WPKH → bc1q…
-    Taproot,  // P2TR → bc1p…
+    Legacy,  // P2PKH  → 1…
+    P2sh,    // P2SH-wrapped P2WPKH → 3…
+    Segwit,  // Native SegWit P2WPKH → bc1q…
+    Taproot, // P2TR → bc1p…
 }
 
 fn parse_address_type(s: &str) -> Result<AddressType, String> {
@@ -151,8 +151,7 @@ pub fn validate_prefix(prefix: &str, addr_type: AddressType) -> Result<(), Strin
     }
     // For Legacy / P2SH the rest must be valid Base58 characters.
     if addr_type == AddressType::Legacy || addr_type == AddressType::P2sh {
-        const BASE58: &str =
-            "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+        const BASE58: &str = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
         for c in prefix.chars() {
             if !BASE58.contains(c) {
                 return Err(format!(
@@ -210,7 +209,10 @@ mod tests {
         assert_eq!(parse_address_type("p2pkh").unwrap(), AddressType::Legacy);
         assert_eq!(parse_address_type("p2sh").unwrap(), AddressType::P2sh);
         assert_eq!(parse_address_type("segwit").unwrap(), AddressType::Segwit);
-        assert_eq!(parse_address_type("native-segwit").unwrap(), AddressType::Segwit);
+        assert_eq!(
+            parse_address_type("native-segwit").unwrap(),
+            AddressType::Segwit
+        );
         assert_eq!(parse_address_type("bech32").unwrap(), AddressType::Segwit);
         assert_eq!(parse_address_type("taproot").unwrap(), AddressType::Taproot);
         assert_eq!(parse_address_type("p2tr").unwrap(), AddressType::Taproot);
@@ -272,7 +274,7 @@ mod tests {
     fn test_make_second_upper() {
         assert_eq!(make_second_upper("3qq"), "3Qq");
         assert_eq!(make_second_upper("3QQ"), "3QQ"); // already upper
-        assert_eq!(make_second_upper("1"), "1");      // too short
+        assert_eq!(make_second_upper("1"), "1"); // too short
         assert_eq!(make_second_upper(""), "");
     }
 }

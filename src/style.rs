@@ -22,7 +22,11 @@ fn is_tty() -> bool {
 /// Helper: apply ANSI only when stderr is a TTY.
 macro_rules! ansi {
     ($code:expr) => {{
-        if is_tty() { $code } else { "" }
+        if is_tty() {
+            $code
+        } else {
+            ""
+        }
     }};
 }
 
@@ -71,9 +75,7 @@ pub fn progress_line(attempts: u64, rate: f64, elapsed: f64) {
         );
     } else {
         // Plain newline for non-TTY (piped output, logs).
-        eprintln!(
-            "  {attempts:>12} attempts  |  {rate:>8.2} Mkeys/s  |  {elapsed:>7.1}s",
-        );
+        eprintln!("  {attempts:>12} attempts  |  {rate:>8.2} Mkeys/s  |  {elapsed:>7.1}s",);
     }
 }
 

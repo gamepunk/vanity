@@ -17,9 +17,9 @@ pub struct WifInfo {
 
 /// Parse a WIF string and return structured information.
 pub fn parse_wif(wif: &str) -> Result<WifInfo, Error> {
-    let pk: bitcoin::PrivateKey = wif.parse().map_err(|e| {
-        Error::InvalidWif(format!("failed to parse WIF: {e}"))
-    })?;
+    let pk: bitcoin::PrivateKey = wif
+        .parse()
+        .map_err(|e| Error::InvalidWif(format!("failed to parse WIF: {e}")))?;
 
     // PrivateKey stores network as NetworkKind internally; convert to Network.
     // WIF version byte 0x80 → Main (Bitcoin), 0xEF → Test (usually Testnet).

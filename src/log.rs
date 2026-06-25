@@ -34,16 +34,18 @@ pub fn log(level: Level, msg: &str) {
         .map(|d| d.as_secs())
         .unwrap_or(0);
 
-    if let Ok(mut file) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(LOG_FILE)
-    {
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(LOG_FILE) {
         let _ = writeln!(file, "[{timestamp}] [{}] {}", level.as_str(), msg);
     }
 }
 
 /// Convenience wrappers.
-pub fn info(msg: &str) { log(Level::Info, msg); }
-pub fn warn(msg: &str) { log(Level::Warn, msg); }
-pub fn error(msg: &str) { log(Level::Error, msg); }
+pub fn info(msg: &str) {
+    log(Level::Info, msg);
+}
+pub fn warn(msg: &str) {
+    log(Level::Warn, msg);
+}
+pub fn error(msg: &str) {
+    log(Level::Error, msg);
+}
