@@ -86,3 +86,5 @@ jobs:
         with:
           files: vanity-*
           generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
