@@ -262,7 +262,9 @@ pub fn validate_prefix(
         for c in body.chars() {
             if !BASE58.contains(c) {
                 return Err(format!(
-                    "Character '{c}' is not in the Base58 alphabet (no 0/O/I/l)."
+                    "Character '{c}' is not in the Base58 alphabet. \
+                     Base58 excludes 0 (zero), O (uppercase o), I (uppercase i), \
+                     and l (lowercase L). Valid: 1-9, A-Z (no I/O), a-z (no l)."
                 ));
             }
         }
@@ -296,7 +298,10 @@ pub fn validate_prefix(
         for c in check.chars() {
             if !BECH32_CHARS.contains(c) {
                 return Err(format!(
-                    "Character '{c}' is not in the Bech32 alphabet ('qpzry9x8gf2tvdw0s3jn54khce6mua7l')."
+                    "Character '{c}' is not valid for Bech32(m) addresses. \
+                     The Bech32 alphabet is only 32 characters: \
+                     qpzry9x8gf2tvdw0s3jn54khce6mua7l \
+                     (common ASCII letters like 'b', 'i', 'o' are NOT valid)."
                 ));
             }
         }
