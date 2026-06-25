@@ -1,0 +1,359 @@
+//! Multi-threaded vanity address search.
+//!
+//! Each worker thread starts from a random secret key and then walks forward
+//! by adding `1` to the secret key (and `G` to the public key) per iteration.
+//! This avoids a full scalar multiplication on every step.
+//!
+//! After `BATCH_SIZE` iterations a thread re-randomises its starting point to
+//! avoid approaching the curve-order boundary.
+
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
+
+use bip39::Mnemonic;
+use bitcoin::{
+    Network,
+    bip32::{DerivationPath, Xpriv},
+    secp256k1::{Secp256k1, SecretKey, Scalar},
+};
+use rand::rngs::OsRng;
+use rand::RngCore;
+
+use crate::address::{self as addr, derive_single};
+use crate::checkpoint;
+use crate::cli::AddressType;
+use crate::style;
+use crate::wif;
+use crate::error::Error;
+
+/// How many iterations a worker does before re-randomising its starting point.
+const BATCH_SIZE: u64 = 5_000_000;
+
+/// Max address indices to scan per BIP32 account before generating a new
+/// mnemonic (2³¹ normal child keys exists per account, but that's huge).
+/// Result produced when a matching address is found.
+#[derive(Debug, Clone)]
+pub struct FoundResult {
+    pub address: String,
+    pub wif: String,
+    pub total_attempts: u64,
+    /// BIP39 mnemonic phrase, present only when `--mnemonic` was used.
+    pub mnemonic_phrase: Option<String>,
+    /// BIP32 derivation path, present only when `--mnemonic` was used.
+    pub derivation_path: Option<String>,
+}
+
+// -----------------------------------------------------------------------
+// Public dispatcher
+// -----------------------------------------------------------------------
+
+/// Launch `num_threads` workers to search for an address whose string
+/// representation starts with `prefix`.
+///
+/// When `use_bip32` is true the workers walk through BIP32 address indices
+/// (each worker generates its own random BIP39 mnemonic), producing a
+/// mnemonic seed phrase together with the result.  This is **much slower**
+/// but allows importing the found key via a standard BIP39 wallet.
+///
+/// This function **blocks** until a match is found.
+pub fn search(
+    prefix: &str,
+    addr_type: AddressType,
+    case_insensitive: bool,
+    compressed: bool,
+    network: Network,
+    num_threads: usize,
+    use_bip32: bool,
+    quiet: bool,
+) -> Result<(FoundResult, std::time::Duration), Error> {
+    let prefix = Arc::new(prefix.to_string());
+    let found = Arc::new(AtomicBool::new(false));
+    let counter = Arc::new(AtomicU64::new(0));
+    let result: Arc<Mutex<Option<FoundResult>>> = Arc::new(Mutex::new(None));
+
+    // Pre-compute the comparison string.
+    let prefix_cmp = if case_insensitive {
+        prefix.to_lowercase()
+    } else {
+        prefix.to_string()
+    };
+
+    let start = Instant::now();
+
+    // ── Spawn workers ───────────────────────────────────────────────
+    let mut handles = Vec::with_capacity(num_threads);
+    for _ in 0..num_threads {
+        let prefix = Arc::clone(&prefix);
+        let prefix_cmp = prefix_cmp.clone();
+        let found = Arc::clone(&found);
+        let counter = Arc::clone(&counter);
+        let result = Arc::clone(&result);
+
+        if use_bip32 {
+            handles.push(std::thread::spawn(move || {
+                worker_bip32(
+                    &prefix,
+                    &prefix_cmp,
+                    addr_type,
+                    case_insensitive,
+                    network,
+                    found,
+                    counter,
+                    result,
+                );
+            }));
+        } else {
+            handles.push(std::thread::spawn(move || {
+                worker(
+                    &prefix,
+                    &prefix_cmp,
+                    addr_type,
+                    case_insensitive,
+                    compressed,
+                    network,
+                    found,
+                    counter,
+                    result,
+                );
+            }));
+        }
+    }
+
+    // ── Progress reporter (main thread) ─────────────────────────────
+    let checkpoint_params = checkpoint::SearchParams {
+        prefix: prefix.to_string(),
+        address_type: addr_type,
+        case_insensitive,
+        threads: num_threads,
+    };
+    let mut checkpoint_tick: u32 = 0;
+
+    loop {
+        std::thread::sleep(std::time::Duration::from_millis(1500));
+
+        if found.load(Ordering::Relaxed) {
+            break;
+        }
+
+        let elapsed = start.elapsed();
+        let n = counter.load(Ordering::Relaxed);
+        let rate = n as f64 / elapsed.as_secs_f64().max(0.001);
+
+        if !quiet {
+            style::progress_line(n, rate / 1_000_000.0, elapsed.as_secs_f64());
+        }
+
+        // Save checkpoint every ~30s (≈20 ticks).
+        checkpoint_tick += 1;
+        if checkpoint_tick % 20 == 0 {
+            checkpoint::save(&checkpoint_params, n, elapsed);
+        }
+    }
+
+    // Final newline after progress line.
+    if !quiet {
+        eprintln!();
+    }
+
+    // ── Join ────────────────────────────────────────────────────────
+    for h in handles {
+        h.join().map_err(|_| Error::ThreadPool("worker panicked".into()))?;
+    }
+
+    let elapsed = start.elapsed();
+    let guard = result.lock().unwrap();
+    guard
+        .clone()
+        .map(|r| (r, elapsed))
+        .ok_or_else(|| Error::ThreadPool("no result found – unexpected".into()))
+}
+
+// -----------------------------------------------------------------------
+// Worker
+// -----------------------------------------------------------------------
+
+#[allow(clippy::too_many_arguments)]
+fn worker(
+    _prefix: &str,
+    prefix_cmp: &str,
+    addr_type: AddressType,
+    case_insensitive: bool,
+    compressed: bool,
+    network: Network,
+    found: Arc<AtomicBool>,
+    counter: Arc<AtomicU64>,
+    result: Arc<Mutex<Option<FoundResult>>>,
+) {
+    let secp = Secp256k1::new();
+    let tweak_one = Scalar::ONE;
+
+    'restart: loop {
+        if found.load(Ordering::Relaxed) {
+            return;
+        }
+
+        // ── Random starting point ───────────────────────────────────
+        let mut sk_bytes = [0u8; 32];
+        OsRng.fill_bytes(&mut sk_bytes);
+        let mut sk = match SecretKey::from_slice(&sk_bytes) {
+            Ok(k) => k,
+            Err(_) => continue, // ≈0 or ≥n → retry
+        };
+        let mut pk = bitcoin::secp256k1::PublicKey::from_secret_key(&secp, &sk);
+
+        for _ in 0..BATCH_SIZE {
+            if found.load(Ordering::Relaxed) {
+                return;
+            }
+
+            // Derive address string (fast path – avoids Address object overhead).
+            let addr_str = match addr_type {
+                AddressType::Legacy => {
+                    let pk_bytes = if compressed {
+                        pk.serialize().to_vec()    // 33 bytes
+                    } else {
+                        pk.serialize_uncompressed().to_vec() // 65 bytes
+                    };
+                    addr::p2pkh_address_fast(&pk_bytes)
+                }
+                AddressType::P2sh => {
+                    let pk_bytes = pk.serialize(); // always compressed for P2SH
+                    addr::p2sh_wpkh_address_fast(&pk_bytes)
+                }
+                _ => {
+                    let a = match derive_single(&secp, &sk, compressed, network, addr_type) {
+                        Ok(v) => v,
+                        Err(_) => continue 'restart,
+                    };
+                    a.to_string()
+                }
+            };
+
+            let n = counter.fetch_add(1, Ordering::Relaxed) + 1;
+
+            // Prefix check.
+            let is_match = if case_insensitive {
+                addr_str.to_lowercase().starts_with(prefix_cmp)
+            } else {
+                addr_str.starts_with(prefix_cmp)
+            };
+
+            if is_match {
+                if !found.swap(true, Ordering::SeqCst) {
+                    let wif = wif::format_wif(&sk, compressed, network);
+                    *result.lock().unwrap() = Some(FoundResult {
+                        address: addr_str,
+                        wif,
+                        total_attempts: n,
+                        mnemonic_phrase: None,
+                        derivation_path: None,
+                    });
+                }
+                return;
+            }
+
+            // Walk forward: sk += 1, pk += G.
+            sk = match sk.add_tweak(&tweak_one) {
+                Ok(k) => k,
+                Err(_) => continue 'restart,
+            };
+            pk = match pk.add_exp_tweak(&secp, &tweak_one) {
+                Ok(p) => p,
+                Err(_) => continue 'restart,
+            };
+        }
+        // Batch exhausted → re-randomise at 'restart.
+    }
+}
+
+// -----------------------------------------------------------------------
+// BIP39+BIP32 worker – checks ONLY address-index 0, generating a fresh
+// mnemonic for every attempt.  This is much slower than the incremental
+// tweaking approach but guarantees that every checked key corresponds to
+// a valid BIP39 mnemonic at a standard HD-wallet derivation path, so the
+// user can import the mnemonic into any BIP39/BIP32 wallet and the FIRST
+// address they see IS the vanity address.
+// -----------------------------------------------------------------------
+
+#[allow(clippy::too_many_arguments)]
+fn worker_bip32(
+    _prefix: &str,
+    prefix_cmp: &str,
+    addr_type: AddressType,
+    case_insensitive: bool,
+    network: Network,
+    found: Arc<AtomicBool>,
+    counter: Arc<AtomicU64>,
+    result: Arc<Mutex<Option<FoundResult>>>,
+) {
+    let secp = Secp256k1::new();
+
+    // BIP44 / BIP49 / BIP84 / BIP86 purpose per address type.
+    let purpose = match addr_type {
+        AddressType::Legacy => 44,
+        AddressType::P2sh => 49,
+        AddressType::Segwit => 84,
+        AddressType::Taproot => 86,
+    };
+    // Full path for address_index = 0:
+    //   m/purpose'/0'/0'/0/0
+    let full_path_str = format!("m/{}'/0'/0'/0/0", purpose);
+    let full_path: DerivationPath = full_path_str
+        .parse()
+        .expect("static BIP32 path is always valid");
+
+    loop {
+        if found.load(Ordering::Relaxed) {
+            return;
+        }
+
+        // ── Generate a fresh BIP39 mnemonic (256-bit / 24 words) ────
+        let mut entropy = [0u8; 32];
+        OsRng.fill_bytes(&mut entropy);
+        let mnemonic = match Mnemonic::from_entropy(&entropy) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        let seed = mnemonic.to_seed("");
+        let master = match Xpriv::new_master(network, &seed) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+
+        // ── Derive the key at the standard HD path with index 0 ─────
+        let child = match master.derive_priv(&secp, &full_path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let addr = match derive_single(&secp, &child.private_key, true, network, addr_type) {
+            Ok(a) => a,
+            Err(_) => continue,
+        };
+        let addr_str = addr.to_string();
+
+        let is_match = if case_insensitive {
+            addr_str.to_lowercase().starts_with(prefix_cmp)
+        } else {
+            addr_str.starts_with(prefix_cmp)
+        };
+
+        let n = counter.fetch_add(1, Ordering::Relaxed) + 1;
+
+        if is_match {
+            if !found.swap(true, Ordering::SeqCst) {
+                let wif = wif::format_wif(&child.private_key, true, network);
+                *result.lock().unwrap() = Some(FoundResult {
+                    address: addr_str,
+                    wif,
+                    total_attempts: n,
+                    mnemonic_phrase: Some(mnemonic.to_string()),
+                    derivation_path: Some(full_path_str),
+                });
+            }
+            return;
+        }
+        // Not a match → generate a brand-new mnemonic and try again.
+    }
+}

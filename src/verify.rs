@@ -1,0 +1,44 @@
+//! `verify` subcommand: parse a WIF, derive all four addresses, and display
+//! them side-by-side for visual comparison.
+
+use bitcoin::Network;
+use bitcoin::secp256k1::Secp256k1;
+
+use crate::address::derive_all;
+use crate::error::Error;
+use crate::wif;
+
+/// Run the verify command.
+pub fn run(wif_str: &str) -> Result<(), Error> {
+    let info = wif::parse_wif(wif_str)?;
+    let secp = Secp256k1::new();
+
+    let set = derive_all(
+        &secp,
+        &info.private_key.inner,
+        info.compressed,
+        info.network,
+    )?;
+
+    let network_label = match info.network {
+        Network::Bitcoin => "Mainnet",
+        Network::Testnet => "Testnet",
+        Network::Signet => "Signet",
+        Network::Regtest => "Regtest",
+        _ => "Unknown",
+    };
+
+    crate::style::header("WIF Verification");
+    crate::style::kv("network", network_label);
+    crate::style::kv("compressed", &info.compressed.to_string());
+    println!();
+
+    crate::style::header("Derived addresses");
+    crate::style::result_line("P2PKH",  &set.legacy.to_string());
+    crate::style::result_line("P2SH",   &set.p2sh_segwit.to_string());
+    crate::style::result_line("P2WPKH", &set.native_segwit.to_string());
+    crate::style::result_line("P2TR",   &set.taproot.to_string());
+    println!();
+
+    Ok(())
+}

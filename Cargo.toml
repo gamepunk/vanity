@@ -1,0 +1,28 @@
+[package]
+name = "vanity"
+version = "0.2.0"
+edition = "2021"
+description = "Bitcoin vanity address generator — find your perfect address"
+
+[dependencies]
+# ── Bitcoin primitives ───────────────────────────────────────────────
+# Provides Address, PrivateKey, PublicKey, Network, and all address
+# encoding (Base58Check, Bech32, Bech32m).  Re-exports secp256k1 crate.
+bitcoin = { version = "0.32", features = ["rand-std", "std"] }
+
+# ── CLI ──────────────────────────────────────────────────────────────
+clap = { version = "4", features = ["derive"] }
+
+# ── Configuration ────────────────────────────────────────────────────
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+
+# ── BIP39 mnemonic ───────────────────────────────────────────────────
+bip39 = { version = "2", features = ["rand"] }
+
+# ── Hot-path hashing (kept separate for performance) ──────────────────
+sha2 = "0.10"
+ripemd = "0.1"
+bs58 = "0.5"
+# ── Misc ─────────────────────────────────────────────────────────────
+rand = "0.8"                     # cryptographic random (OsRng)
