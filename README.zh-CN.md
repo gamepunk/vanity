@@ -52,7 +52,7 @@ Bark 为可选项，不影响核心功能。
 
 ## 命令
 
-### `vanity` / `vanity search` — 搜索虚荣地址
+### `vanitygen` / `vanity search` — 搜索虚荣地址
 
 **默认命令。** 查找以指定前缀开头的地址。
 
@@ -76,7 +76,7 @@ vanity search 1Bit
 **示例：**
 
 ```
-$ vanity 1Pizza -T 8
+$ vanitygen 1Pizza -T 8
 >> Self-test passed
 >> Searching
   prefix: 1Pizza
@@ -95,7 +95,7 @@ $ vanity 1Pizza -T 8
 ### `vanity verify` — 验证 WIF 私钥
 
 ```
-$ vanity verify Kz6K83ge1AeeDi7fvE7kxGkyYws47sucXUZZwMXVTFG9q7u4ey12
+$ vanitygen verify Kz6K83ge1AeeDi7fvE7kxGkyYws47sucXUZZwMXVTFG9q7u4ey12
 >> WIF Verification
   network: Mainnet
   compressed: true
@@ -112,7 +112,7 @@ $ vanity verify Kz6K83ge1AeeDi7fvE7kxGkyYws47sucXUZZwMXVTFG9q7u4ey12
 ### `vanity address` — 查看私钥对应的全部地址
 
 ```
-$ vanity address <WIF>
+$ vanitygen address <WIF>
 ```
 
 ---
@@ -126,7 +126,7 @@ $ vanity address <WIF>
 ### `vanity benchmark` — 性能测试
 
 ```
-$ vanity benchmark
+$ vanitygen benchmark
 >> Benchmark
   threads: 8
   iterations: 400000
@@ -176,7 +176,7 @@ vanity 1Pizza --bark YOUR_KEY_HERE
 
 ## 配置文件
 
-`vanity` 从 `~/.config/vanity/config.toml`（XDG 标准）加载配置。
+`vanitygen` 从 `~/.config/vanity/config.toml`（XDG 标准）加载配置。
 
 ```toml
 # ~/.config/vanity/config.toml

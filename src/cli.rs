@@ -11,23 +11,23 @@ use clap::{Parser, Subcommand};
 /// Bitcoin vanity address generator.
 #[derive(Parser)]
 #[command(
-    name = "vanity",
+    name = "vanitygen",
     version,
     about = "Generate custom vanity Bitcoin addresses",
     long_about = None,
     after_help = "\
 Run directly after build:
   cargo build --release
-  ./target/release/vanity 1Bit
+  ./target/release/vanitygen 1Bit
 
 Install globally:
-  cargo install --path .
-  vanity 1Bit
+  cargo install vanitygen
+  vanitygen 1Bit
 
 Examples:
-  vanity 1Bit                   Search Legacy prefix
-  vanity bc1qninja -t segwit   Search SegWit prefix
-  vanity verify <WIF>           Verify a private key
+  vanitygen 1Bit                   Search Legacy prefix
+  vanitygen bc1qninja -t segwit   Search SegWit prefix
+  vanitygen verify <WIF>           Verify a private key
 
 All commands accept -h (or --help) for more options.",
 )]

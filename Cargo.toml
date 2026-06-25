@@ -11,7 +11,7 @@ keywords = ["bitcoin", "vanity", "address", "crypto", "wallet"]
 categories = ["command-line-utilities", "cryptography"]
 
 [[bin]]
-name = "vanity"
+name = "vanitygen"
 path = "src/main.rs"
 
 [dependencies]

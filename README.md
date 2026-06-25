@@ -28,7 +28,7 @@ All cryptographic primitives are delegated to the audited
 
 ```bash
 cargo build --release
-./target/release/vanity 1Bit
+./target/release/vanitygen 1Bit
 ```
 
 Or install globally:
@@ -53,7 +53,7 @@ without it.
 
 ## Commands
 
-### `vanity` / `vanity search` — Search for a vanity address
+### `vanitygen` / `vanity search` — Search for a vanity address
 
 **Default command.**  Find an address whose string starts with a given prefix.
 
@@ -78,7 +78,7 @@ vanity search 1Bit
 
 Search Legacy, normal mode (fast, outputs WIF):
 ```
-$ vanity 1Pizza -T 8
+$ vanitygen 1Pizza -T 8
 >> Self-test passed
 >> Searching
   prefix: 1Pizza
@@ -100,7 +100,7 @@ $ vanity 1Pizza -T 8
 
 Search with mnemonic (slower, outputs 24-word seed phrase):
 ```
-$ vanity 1Pizza -m
+$ vanitygen 1Pizza -m
 >> Searching
   prefix: 1Pizza
   type: Legacy (P2PKH)
@@ -137,7 +137,7 @@ vanity bc1pbit -t taproot
 Parse a WIF and show all four derived addresses.
 
 ```
-$ vanity verify Kz6K83ge1AeeDi7fvE7kxGkyYws47sucXUZZwMXVTFG9q7u4ey12
+$ vanitygen verify Kz6K83ge1AeeDi7fvE7kxGkyYws47sucXUZZwMXVTFG9q7u4ey12
 >> WIF Verification
   network: Mainnet
   compressed: true
@@ -156,7 +156,7 @@ $ vanity verify Kz6K83ge1AeeDi7fvE7kxGkyYws47sucXUZZwMXVTFG9q7u4ey12
 Shows all four address formats from a single private key.
 
 ```
-$ vanity address Kz6K83ge1AeeDi7fvE7kxGkyYws47sucXUZZwMXVTFG9q7u4ey12
+$ vanitygen address Kz6K83ge1AeeDi7fvE7kxGkyYws47sucXUZZwMXVTFG9q7u4ey12
 >> Addresses from private key
   network: Mainnet
   compressed: true
@@ -176,7 +176,7 @@ Creates a 24-word BIP39 mnemonic (256-bit) and derives addresses
 for all 4 standard BIP32 paths at index 0.
 
 ```
-$ vanity mnemonic
+$ vanitygen mnemonic
 >> BIP39 Mnemonic (24 words, 256-bit)
   abandon ability able about above absent abstract ...
 
@@ -199,7 +199,7 @@ can steal your funds.
 Derives all 4 address types from random keys to measure throughput.
 
 ```
-$ vanity benchmark
+$ vanitygen benchmark
 >> Benchmark
   threads: 8
   iterations: 400000 (50000 per thread)
@@ -272,7 +272,7 @@ Uses system `curl` — zero deps.  Not available on Windows (no `curl`).
 
 ## Configuration file
 
-`vanity` loads settings from `~/.config/vanity/config.toml` (XDG standard).
+`vanitygen` loads settings from `~/.config/vanity/config.toml` (XDG standard).
 
 ```toml
 # ~/.config/vanity/config.toml
