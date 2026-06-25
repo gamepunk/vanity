@@ -28,14 +28,14 @@
 
 ```bash
 cargo build --release
-./target/release/vanity 1Bit
+./target/release/vanitygen 1Bit
 ```
 
 或全局安装：
 
 ```bash
 cargo install --git https://github.com/gamepunk/vanity.git
-vanity 1Bit
+vanitygen 1Bit
 ```
 
 ### 平台支持
@@ -57,8 +57,8 @@ Bark 为可选项，不影响核心功能。
 **默认命令。** 查找以指定前缀开头的地址。
 
 ```
-vanity 1Bit
-vanity search 1Bit
+vanitygen 1Bit
+vanitygen search 1Bit
 ```
 
 **选项：**
@@ -92,7 +92,7 @@ $ vanitygen 1Pizza -T 8
 
 ---
 
-### `vanity verify` — 验证 WIF 私钥
+### `vanitygen verify` — 验证 WIF 私钥
 
 ```
 $ vanitygen verify Kz6K83ge1AeeDi7fvE7kxGkyYws47sucXUZZwMXVTFG9q7u4ey12
@@ -109,7 +109,7 @@ $ vanitygen verify Kz6K83ge1AeeDi7fvE7kxGkyYws47sucXUZZwMXVTFG9q7u4ey12
 
 ---
 
-### `vanity address` — 查看私钥对应的全部地址
+### `vanitygen address` — 查看私钥对应的全部地址
 
 ```
 $ vanitygen address <WIF>
@@ -117,13 +117,13 @@ $ vanitygen address <WIF>
 
 ---
 
-### `vanity mnemonic` — 生成随机 BIP39 钱包
+### `vanitygen mnemonic` — 生成随机 BIP39 钱包
 
 生成 24 词助记词 + 4 条标准 BIP32 路径的地址。
 
 ---
 
-### `vanity benchmark` — 性能测试
+### `vanitygen benchmark` — 性能测试
 
 ```
 $ vanitygen benchmark
@@ -165,10 +165,10 @@ M 系列 Mac（8 线程，~1 Mkeys/s）上的参考数据。
 
 ```bash
 # 通过命令行参数：
-vanity 1Pizza --bark YOUR_KEY_HERE
+vanitygen 1Pizza --bark YOUR_KEY_HERE
 
 # 或通过配置文件（推荐）：
-# ~/.config/vanity/config.toml
+# ~/.config/vanitygen/config.toml
 #   bark_key = "YOUR_KEY_HERE"
 ```
 
@@ -176,10 +176,10 @@ vanity 1Pizza --bark YOUR_KEY_HERE
 
 ## 配置文件
 
-`vanitygen` 从 `~/.config/vanity/config.toml`（XDG 标准）加载配置。
+`vanitygen` 从 `~/.config/vanitygen/config.toml`（XDG 标准）加载配置。
 
 ```toml
-# ~/.config/vanity/config.toml
+# ~/.config/vanitygen/config.toml
 
 # 默认线程数
 # threads = 8
@@ -198,7 +198,7 @@ CLI 参数优先级高于配置文件。
 ## 依赖
 
 ```
-vanity v0.2.0
+vanitygen v0.3.1
 ├── bip39       — BIP39 助记词生成
 ├── bitcoin     — 比特币地址/密钥类型
 ├── bs58        — Base58Check 编码（热路径）

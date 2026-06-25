@@ -1,4 +1,4 @@
-# vanity
+# vanitygen
 
 [![CI](https://github.com/gamepunk/vanity/actions/workflows/ci.yml/badge.svg)](https://github.com/gamepunk/vanity/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/vanitygen.svg)](https://crates.io/crates/vanitygen)
@@ -35,7 +35,7 @@ Or install globally:
 
 ```bash
 cargo install --git <repo-url>
-vanity 1Bit
+vanitygen 1Bit
 ```
 
 ### Platform notes
@@ -53,13 +53,13 @@ without it.
 
 ## Commands
 
-### `vanitygen` / `vanity search` — Search for a vanity address
+### `vanitygen` / `vanitygen search` — Search for a vanity address
 
 **Default command.**  Find an address whose string starts with a given prefix.
 
 ```
-vanity 1Bit
-vanity search 1Bit
+vanitygen 1Bit
+vanitygen search 1Bit
 ```
 
 **Options:**
@@ -125,14 +125,14 @@ $ vanitygen 1Pizza -m
 
 Search other address types:
 ```
-vanity bc1qbit -t segwit
-vanity 3Pizza -t p2sh
-vanity bc1pbit -t taproot
+vanitygen bc1qbit -t segwit
+vanitygen 3Pizza -t p2sh
+vanitygen bc1pbit -t taproot
 ```
 
 ---
 
-### `vanity verify` — Validate a WIF private key
+### `vanitygen verify` — Validate a WIF private key
 
 Parse a WIF and show all four derived addresses.
 
@@ -151,7 +151,7 @@ $ vanitygen verify Kz6K83ge1AeeDi7fvE7kxGkyYws47sucXUZZwMXVTFG9q7u4ey12
 
 ---
 
-### `vanity address` — Derive all address types from a key
+### `vanitygen address` — Derive all address types from a key
 
 Shows all four address formats from a single private key.
 
@@ -170,7 +170,7 @@ $ vanitygen address Kz6K83ge1AeeDi7fvE7kxGkyYws47sucXUZZwMXVTFG9q7u4ey12
 
 ---
 
-### `vanity mnemonic` — Generate a random BIP39 wallet
+### `vanitygen mnemonic` — Generate a random BIP39 wallet
 
 Creates a 24-word BIP39 mnemonic (256-bit) and derives addresses
 for all 4 standard BIP32 paths at index 0.
@@ -194,7 +194,7 @@ can steal your funds.
 
 ---
 
-### `vanity benchmark` — Measure performance
+### `vanitygen benchmark` — Measure performance
 
 Derives all 4 address types from random keys to measure throughput.
 
@@ -257,10 +257,10 @@ Receive an iOS push notification when a match is found.
 
 ```bash
 # Via CLI flag:
-vanity 1Pizza --bark YOUR_KEY_HERE
+vanitygen 1Pizza --bark YOUR_KEY_HERE
 
 # Or via config file (recommended):
-#   ~/.config/vanity/config.toml
+#   ~/.config/vanitygen/config.toml
 #   bark_key = "YOUR_KEY_HERE"
 ```
 
@@ -272,10 +272,10 @@ Uses system `curl` — zero deps.  Not available on Windows (no `curl`).
 
 ## Configuration file
 
-`vanitygen` loads settings from `~/.config/vanity/config.toml` (XDG standard).
+`vanitygen` loads settings from `~/.config/vanitygen/config.toml` (XDG standard).
 
 ```toml
-# ~/.config/vanity/config.toml
+# ~/.config/vanitygen/config.toml
 
 # Default thread count (overridable by -T / --threads)
 threads = 8
@@ -294,7 +294,7 @@ CLI flags always override config file values.
 ## Dependencies
 
 ```
-vanity v0.2.0
+vanitygen v0.3.1
 ├── bip39       — BIP39 mnemonic generation
 ├── bitcoin     — Bitcoin address / key types
 ├── bs58        — Base58Check encoding (hot path)

@@ -86,7 +86,7 @@ fn candidate_paths() -> Vec<PathBuf> {
             let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
             PathBuf::from(home).join(".config")
         });
-    paths.push(xdg.join("vanity").join("config.toml"));
+    paths.push(xdg.join("vanitygen").join("config.toml"));
 
     paths
 }
