@@ -12,7 +12,6 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use bip39::Mnemonic;
-use regex::Regex;
 use bitcoin::{
     bip32::{DerivationPath, Xpriv},
     secp256k1::{Scalar, Secp256k1, SecretKey},
@@ -20,6 +19,7 @@ use bitcoin::{
 };
 use rand::rngs::OsRng;
 use rand::RngCore;
+use regex::Regex;
 
 use crate::address::{self as addr, derive_single};
 use crate::checkpoint;
@@ -110,9 +110,10 @@ pub fn search(
 
     // Pre-compile regex if needed.
     let re: Option<Regex> = match *match_mode {
-        MatchMode::Regex => Some(Regex::new(&pattern).map_err(|e| {
-            Error::Other(format!("Invalid regex pattern: {e}"))
-        })?),
+        MatchMode::Regex => Some(
+            Regex::new(&pattern)
+                .map_err(|e| Error::Other(format!("Invalid regex pattern: {e}")))?,
+        ),
         _ => None,
     };
     let re = Arc::new(re);
@@ -288,7 +289,13 @@ fn worker(
             let n = counter.fetch_add(1, Ordering::Relaxed) + 1;
 
             // Match check using the configured match mode.
-            let is_match = is_match(&addr_str, cmp_pat, *match_mode, case_insensitive, re.as_ref());
+            let is_match = is_match(
+                &addr_str,
+                cmp_pat,
+                *match_mode,
+                case_insensitive,
+                re.as_ref(),
+            );
 
             if is_match {
                 if !found.swap(true, Ordering::SeqCst) {
@@ -387,7 +394,13 @@ fn worker_bip32(
         let addr_str = addr.to_string();
 
         // Match check using the configured match mode.
-        let is_match = is_match(&addr_str, cmp_pat, *match_mode, case_insensitive, re.as_ref());
+        let is_match = is_match(
+            &addr_str,
+            cmp_pat,
+            *match_mode,
+            case_insensitive,
+            re.as_ref(),
+        );
 
         let n = counter.fetch_add(1, Ordering::Relaxed) + 1;
 

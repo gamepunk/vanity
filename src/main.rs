@@ -250,7 +250,10 @@ fn run_search(
         style::header("Same-key addresses");
         style::result_line("Legacy (P2PKH)", &all_addrs.legacy.to_string());
         style::result_line("Nested SegWit (P2SH)", &all_addrs.p2sh_segwit.to_string());
-        style::result_line("Native SegWit (P2WPKH)", &all_addrs.native_segwit.to_string());
+        style::result_line(
+            "Native SegWit (P2WPKH)",
+            &all_addrs.native_segwit.to_string(),
+        );
         style::result_line("Taproot (P2TR)", &all_addrs.taproot.to_string());
     }
 

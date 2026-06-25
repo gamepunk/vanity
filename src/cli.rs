@@ -139,11 +139,21 @@ pub enum MatchMode {
 }
 
 /// Resolve match mode from CLI flags (default: Prefix).
-pub fn resolve_match_mode(_match_prefix: bool, suffix: bool, anywhere: bool, regex: bool) -> MatchMode {
-    if suffix { MatchMode::Suffix }
-    else if anywhere { MatchMode::Anywhere }
-    else if regex { MatchMode::Regex }
-    else { MatchMode::Prefix }
+pub fn resolve_match_mode(
+    _match_prefix: bool,
+    suffix: bool,
+    anywhere: bool,
+    regex: bool,
+) -> MatchMode {
+    if suffix {
+        MatchMode::Suffix
+    } else if anywhere {
+        MatchMode::Anywhere
+    } else if regex {
+        MatchMode::Regex
+    } else {
+        MatchMode::Prefix
+    }
 }
 fn parse_address_type(s: &str) -> Result<AddressType, String> {
     match s.to_lowercase().as_str() {
